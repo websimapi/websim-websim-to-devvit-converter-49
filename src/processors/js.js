@@ -16,10 +16,8 @@ export function processJS(jsContent, filename = 'script.js', analyzer) {
     // Generic WebSim URL Replacements (Fix CSP issues & Hot-swap Identity)
     // We replace WebSim avatar URLs with the server-side proxy "/api/proxy/avatar/username".
     // This ensures new Image().src works immediately without needing DOM injection, preventing game loader hangs.
-    code = code.replace(/https:\/\/images\.websim\.ai\/avatar\/|https:\/\/images\.websim\.com\/avatar\//g, '/api/proxy/avatar/');
-    
-    // Replace full literal avatar strings if found (e.g. "https://.../avatar/someuser")
-    code = code.replace(/["']https:\/\/images\.websim\.(ai|com)\/avatar\/([^"']+)["']/g, '"/api/proxy/avatar/$2"');
+    // Use backreference \1 to ensure we match the same closing quote, preventing syntax errors in nested strings
+    code = code.replace(/(["'])https:\/\/images\.websim\.(?:ai|com)\/avatar\/([^"']*)\1/g, '$1/api/proxy/avatar/$2$1');
 
     // Calculate relative path to root for asset corrections
     const depth = (filename.match(/\//g) || []).length;
@@ -108,7 +106,8 @@ export function processJS(jsContent, filename = 'script.js', analyzer) {
                     
                     if (left.type === 'Literal' && typeof left.value === 'string') {
                         const val = left.value;
-                        const isWebSim = val.includes('images.websim.ai/avatar/') || val.includes('images.websim.com/avatar/');
+                        // Check for both original WebSim URLs and the proxy version (created by the regex above)
+                        const isWebSim = val.includes('images.websim.ai/avatar/') || val.includes('images.websim.com/avatar/') || val.includes('/api/proxy/avatar/');
                         const isPlaceholder = val.includes('/_websim_avatar_/');
                         
                         if (isWebSim || isPlaceholder) {
